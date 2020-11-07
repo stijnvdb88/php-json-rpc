@@ -60,7 +60,7 @@ class Server
      * @see Responses\ResultResponse
      * @see Responses\ErrorResponse
      */
-    public function reply($json)
+    public function reply($json, $connection)
     {
         if (is_string($json)) {
             $input = json_decode($json, true);
@@ -68,7 +68,7 @@ class Server
             $input = null;
         }
 
-        $reply = $this->rawReply($input);
+        $reply = $this->rawReply($input, $connection);
 
         if (is_array($reply)) {
             $output = json_encode($reply);
@@ -96,10 +96,10 @@ class Server
      * Returns null if no reply is necessary
      * Returns the JSON-RPC 2.0 server reply as an array
      */
-    public function rawReply($input)
+    public function rawReply($input, $connection)
     {
         if (is_array($input)) {
-            $reply = $this->processInput($input);
+            $reply = $this->processInput($input, $connection);
         } else {
             $reply = $this->parseError();
         }
@@ -118,17 +118,17 @@ class Server
      * Returns an array of response/error objects when multiple queries are made.
      * Returns null when no response is necessary.
      */
-    private function processInput(array $input)
+    private function processInput(array $input, $connection)
     {
         if (count($input) === 0) {
             return $this->requestError();
         }
 
         if (isset($input[0])) {
-            return $this->processBatchRequests($input);
+            return $this->processBatchRequests($input, $connection);
         }
 
-        return $this->processRequest($input);
+        return $this->processRequest($input, $connection);
     }
 
     /**
@@ -142,12 +142,12 @@ class Server
      * Returns an array of response/error objects when multiple queries are made.
      * Returns null when no response is necessary.
      */
-    private function processBatchRequests($input)
+    private function processBatchRequests($input, $connection)
     {
         $replies = array();
 
         foreach ($input as $request) {
-            $reply = $this->processRequest($request);
+            $reply = $this->processRequest($request, $connection);
 
             if ($reply !== null) {
                 $replies[] = $reply;
@@ -171,7 +171,7 @@ class Server
      * Returns a response object or an error object.
      * Returns null when no response is necessary.
      */
-    private function processRequest($request)
+    private function processRequest($request, $connection)
     {
         if (!is_array($request)) {
             return $this->requestError();
@@ -210,10 +210,10 @@ class Server
         }
 
         if ($isQuery) {
-            return $this->processQuery($id, $method, $arguments);
+            return $this->processQuery($id, $method, $arguments, $connection);
         }
 
-        $this->processNotification($method, $arguments);
+        $this->processNotification($method, $arguments, $connection);
         return null;
     }
 
@@ -230,13 +230,16 @@ class Server
      * @param array $arguments
      * Array of arguments that will be passed to the method.
      *
+     * @param mixed $connection
+     * Connection data to pass to the method 
+     *
      * @return array
      * Returns a response object or an error object.
      */
-    private function processQuery($id, $method, $arguments)
+    private function processQuery($id, $method, $arguments, $connection)
     {
         try {
-            $result = $this->evaluator->evaluate($method, $arguments);
+            $result = $this->evaluator->evaluate($method, $arguments, $connection);
             return $this->response($id, $result);
         } catch (Exception $exception) {
             $code = $exception->getCode();
@@ -256,10 +259,10 @@ class Server
      * @param array $arguments
      * Array of arguments that will be passed to the method.
      */
-    private function processNotification($method, $arguments)
+    private function processNotification($method, $arguments, $connection)
     {
         try {
-            $this->evaluator->evaluate($method, $arguments);
+            $this->evaluator->evaluate($method, $arguments, $connection);
         } catch (Exception $exception) {
         }
     }

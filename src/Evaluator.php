@@ -31,5 +31,5 @@ interface Evaluator
      * @param array $arguments
      * @return mixed
      */
-    public function evaluate($method, $arguments);
+    public function evaluate($method, $arguments, $connection);
 }
